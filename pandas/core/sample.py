@@ -34,25 +34,23 @@ def preprocess_weights(obj: NDFrame, weights, axis: AxisInt) -> np.ndarray:
 
     # Strings acceptable if a dataframe and axis = 0
     if isinstance(weights, str):
-        if isinstance(obj, ABCDataFrame):
-            if axis == 0:
-                try:
-                    weights = obj[weights]
-                except KeyError as err:
-                    raise KeyError(
-                        "String passed to weights not a valid column"
-                    ) from err
-            else:
-                raise ValueError(
-                    "Strings can only be passed to "
-                    "weights when sampling from rows on "
-                    "a DataFrame"
-                )
-        else:
+        if not isinstance(obj, ABCDataFrame):
             raise ValueError(
                 "Strings cannot be passed as weights when sampling from a Series."
             )
 
+        if axis != 0:
+            raise ValueError(
+                "Strings can only be passed to "
+                "weights when sampling from rows on "
+                "a DataFrame"
+            )
+        try:
+            weights = obj[weights]
+        except KeyError as err:
+            raise KeyError(
+                "String passed to weights not a valid column"
+            ) from err
     if isinstance(obj, ABCSeries):
         func = obj._constructor
     else:

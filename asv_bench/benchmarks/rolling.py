@@ -256,7 +256,7 @@ class PeakMemFixedWindowMinMax:
         self.roll = pd.Series(arr).rolling(2)
 
     def peakmem_fixed(self, operation):
-        for x in range(5):
+        for _ in range(5):
             getattr(self.roll, operation)()
 
 

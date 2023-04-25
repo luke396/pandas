@@ -135,12 +135,7 @@ def _ensure_data(values: ArrayLike) -> np.ndarray:
     elif isinstance(values.dtype, BaseMaskedDtype):
         # i.e. BooleanArray, FloatingArray, IntegerArray
         values = cast("BaseMaskedArray", values)
-        if not values._hasna:
-            # No pd.NAs -> We can avoid an object-dtype cast (and copy) GH#41816
-            #  recurse to avoid re-implementing logic for eg bool->uint8
-            return _ensure_data(values._data)
-        return np.asarray(values)
-
+        return np.asarray(values) if values._hasna else _ensure_data(values._data)
     elif isinstance(values.dtype, CategoricalDtype):
         # NB: cases that go through here should NOT be using _reconstruct_data
         #  on the back-end.
@@ -170,7 +165,6 @@ def _ensure_data(values: ArrayLike) -> np.ndarray:
     elif is_complex_dtype(values.dtype):
         return cast(np.ndarray, values)
 
-    # datetimelike
     elif needs_i8_conversion(values.dtype):
         npvalues = values.view("i8")
         npvalues = cast(np.ndarray, npvalues)
@@ -279,12 +273,8 @@ def _check_object_for_strings(values: np.ndarray) -> str:
     str
     """
     ndtype = values.dtype.name
-    if ndtype == "object":
-        # it's cheaper to use a String Hash Table than Object; we infer
-        # including nulls because that is the only difference between
-        # StringHashTable and ObjectHashtable
-        if lib.is_string_array(values, skipna=False):
-            ndtype = "string"
+    if ndtype == "object" and lib.is_string_array(values, skipna=False):
+        ndtype = "string"
     return ndtype
 
 
@@ -408,9 +398,7 @@ def nunique_ints(values: ArrayLike) -> int:
     if len(values) == 0:
         return 0
     values = _ensure_data(values)
-    # bincount requires intp
-    result = (np.bincount(values.ravel().astype("intp")) != 0).sum()
-    return result
+    return (np.bincount(values.ravel().astype("intp")) != 0).sum()
 
 
 def unique_with_mask(values, mask: npt.NDArray[np.bool_] | None = None):
@@ -853,47 +841,46 @@ def value_counts(
 
         # if we are dropna and we have NO values
         if dropna and (result._values == 0).all():
-            result = result.iloc[0:0]
+            result = result.iloc[:0]
 
         # normalizing is by len of all (regardless of dropna)
         counts = np.array([len(ii)])
 
+    elif is_extension_array_dtype(values):
+        # handle Categorical and sparse,
+        result = Series(values, copy=False)._values.value_counts(dropna=dropna)
+        counts = result._values
+        result.name = name
+        result.index.name = index_name
+        if not isinstance(counts, np.ndarray):
+            # e.g. ArrowExtensionArray
+            counts = np.asarray(counts)
+
+    elif isinstance(values, ABCMultiIndex):
+        # GH49558
+        levels = list(range(values.nlevels))
+        result = (
+            Series(index=values, name=name)
+            .groupby(level=levels, dropna=dropna)
+            .size()
+        )
+        result.index.names = values.names
+        counts = result._values
+
     else:
-        if is_extension_array_dtype(values):
-            # handle Categorical and sparse,
-            result = Series(values, copy=False)._values.value_counts(dropna=dropna)
-            result.name = name
-            result.index.name = index_name
-            counts = result._values
-            if not isinstance(counts, np.ndarray):
-                # e.g. ArrowExtensionArray
-                counts = np.asarray(counts)
+        values = _ensure_arraylike(values)
+        keys, counts = value_counts_arraylike(values, dropna)
+        if keys.dtype == np.float16:
+            keys = keys.astype(np.float32)
 
-        elif isinstance(values, ABCMultiIndex):
-            # GH49558
-            levels = list(range(values.nlevels))
-            result = (
-                Series(index=values, name=name)
-                .groupby(level=levels, dropna=dropna)
-                .size()
-            )
-            result.index.names = values.names
-            counts = result._values
+        # For backwards compatibility, we let Index do its normal type
+        #  inference, _except_ for if if infers from object to bool.
+        idx = Index(keys)
+        if idx.dtype == bool and keys.dtype == object:
+            idx = idx.astype(object)
+        idx.name = index_name
 
-        else:
-            values = _ensure_arraylike(values)
-            keys, counts = value_counts_arraylike(values, dropna)
-            if keys.dtype == np.float16:
-                keys = keys.astype(np.float32)
-
-            # For backwards compatibility, we let Index do its normal type
-            #  inference, _except_ for if if infers from object to bool.
-            idx = Index(keys)
-            if idx.dtype == bool and keys.dtype == object:
-                idx = idx.astype(object)
-            idx.name = index_name
-
-            result = Series(counts, index=idx, name=name, copy=False)
+        result = Series(counts, index=idx, name=name, copy=False)
 
     if sort:
         result = result.sort_values(ascending=ascending)
@@ -925,12 +912,9 @@ def value_counts_arraylike(
 
     keys, counts = htable.value_count(values, dropna, mask=mask)
 
-    if needs_i8_conversion(original.dtype):
-        # datetime, timedelta, or period
-
-        if dropna:
-            mask = keys != iNaT
-            keys, counts = keys[mask], counts[mask]
+    if needs_i8_conversion(original.dtype) and dropna:
+        mask = keys != iNaT
+        keys, counts = keys[mask], counts[mask]
 
     res_keys = _reconstruct_data(keys, original.dtype, original)
     return res_keys, counts
@@ -1002,8 +986,7 @@ def mode(
             stacklevel=find_stack_level(),
         )
 
-    result = _reconstruct_data(npresult, original.dtype, original)
-    return result
+    return _reconstruct_data(npresult, original.dtype, original)
 
 
 def rank(
@@ -1101,12 +1084,7 @@ def checked_add_with_arr(
     # For performance reasons, we broadcast 'b' to the new array 'b2'
     # so that it has the same size as 'arr'.
     b2 = np.broadcast_to(b, arr.shape)
-    if b_mask is not None:
-        # We do the same broadcasting for b_mask as well.
-        b2_mask = np.broadcast_to(b_mask, arr.shape)
-    else:
-        b2_mask = None
-
+    b2_mask = np.broadcast_to(b_mask, arr.shape) if b_mask is not None else None
     # For elements that are NaN, regardless of their value, we should
     # ignore whether they overflow or not when doing the checked add.
     if arr_mask is not None and b2_mask is not None:
@@ -1250,13 +1228,12 @@ def take(
     if allow_fill:
         # Pandas style, -1 means NA
         validate_indices(indices, arr.shape[axis])
-        result = take_nd(
+        return take_nd(
             arr, indices, axis=axis, allow_fill=True, fill_value=fill_value
         )
     else:
         # NumPy style
-        result = arr.take(indices, axis=axis)
-    return result
+        return arr.take(indices, axis=axis)
 
 
 # ------------ #
@@ -1375,33 +1352,27 @@ def diff(arr, n: int, axis: AxisInt = 0):
     shifted
     """
 
-    n = int(n)
+    n = n
     na = np.nan
     dtype = arr.dtype
 
     is_bool = is_bool_dtype(dtype)
-    if is_bool:
-        op = operator.xor
-    else:
-        op = operator.sub
-
+    op = operator.xor if is_bool else operator.sub
     if isinstance(dtype, PandasDtype):
         # PandasArray cannot necessarily hold shifted versions of itself.
         arr = arr.to_numpy()
         dtype = arr.dtype
 
     if not isinstance(dtype, np.dtype):
-        # i.e ExtensionDtype
-        if hasattr(arr, f"__{op.__name__}__"):
-            if axis != 0:
-                raise ValueError(f"cannot diff {type(arr).__name__} on axis={axis}")
-            return op(arr, arr.shift(n))
-        else:
+        if not hasattr(arr, f"__{op.__name__}__"):
             raise TypeError(
                 f"{type(arr).__name__} has no 'diff' method. "
                 "Convert to a suitable dtype prior to calling 'diff'."
             )
 
+        if axis != 0:
+            raise ValueError(f"cannot diff {type(arr).__name__} on axis={axis}")
+        return op(arr, arr.shift(n))
     is_timedelta = False
     if needs_i8_conversion(arr.dtype):
         dtype = np.int64
@@ -1418,11 +1389,7 @@ def diff(arr, n: int, axis: AxisInt = 0):
 
         # int8, int16 are incompatible with float64,
         # see https://github.com/cython/cython/issues/2646
-        if arr.dtype.name in ["int8", "int16"]:
-            dtype = np.float32
-        else:
-            dtype = np.float64
-
+        dtype = np.float32 if arr.dtype.name in ["int8", "int16"] else np.float64
     orig_ndim = arr.ndim
     if orig_ndim == 1:
         # reshape so we can always use algos.diff_2d
@@ -1563,7 +1530,7 @@ def safe_sort(
         )
     codes = ensure_platform_int(np.asarray(codes))
 
-    if not assume_unique and not len(unique(values)) == len(values):
+    if not assume_unique and len(unique(values)) != len(values):
         raise ValueError("values should be unique if codes is not None")
 
     if sorter is None:
@@ -1577,21 +1544,13 @@ def safe_sort(
         # take_nd is faster, but only works for na_sentinels of -1
         order2 = sorter.argsort()
         new_codes = take_nd(order2, codes, fill_value=-1)
-        if verify:
-            mask = (codes < -len(values)) | (codes >= len(values))
-        else:
-            mask = None
+        mask = (codes < -len(values)) | (codes >= len(values)) if verify else None
     else:
         reverse_indexer = np.empty(len(sorter), dtype=np.int_)
         reverse_indexer.put(sorter, np.arange(len(sorter)))
         # Out of bound indices will be masked with `-1` next, so we
         # may deal with them here without performance loss using `mode='wrap'`
         new_codes = reverse_indexer.take(codes, mode="wrap")
-
-        if use_na_sentinel:
-            mask = codes == -1
-            if verify:
-                mask = mask | (codes < -len(values)) | (codes >= len(values))
 
     if use_na_sentinel and mask is not None:
         np.putmask(new_codes, mask, -1)
@@ -1742,10 +1701,7 @@ def map_array(
         # Since values were input this means we came from either
         # a dict or a series and mapper should be an index
         indexer = mapper.index.get_indexer(arr)
-        new_values = take_nd(mapper._values, indexer)
-
-        return new_values
-
+        return take_nd(mapper._values, indexer)
     if not len(arr):
         return arr.copy()
 

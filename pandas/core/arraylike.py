@@ -481,7 +481,7 @@ def default_array_ufunc(self, ufunc: np.ufunc, method: str, *inputs, **kwargs):
     -----
     We are assuming that `self` is among `inputs`.
     """
-    if not any(x is self for x in inputs):
+    if all(x is not self for x in inputs):
         raise NotImplementedError
 
     new_inputs = [x if x is not self else np.asarray(x) for x in inputs]

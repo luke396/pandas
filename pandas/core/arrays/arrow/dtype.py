@@ -119,15 +119,9 @@ class ArrowDtype(StorageExtensionDtype):
         elif pa.types.is_boolean(pa_type):
             return bool
         elif pa.types.is_duration(pa_type):
-            if pa_type.unit == "ns":
-                return Timedelta
-            else:
-                return timedelta
+            return Timedelta if pa_type.unit == "ns" else timedelta
         elif pa.types.is_timestamp(pa_type):
-            if pa_type.unit == "ns":
-                return Timestamp
-            else:
-                return datetime
+            return Timestamp if pa_type.unit == "ns" else datetime
         elif pa.types.is_date(pa_type):
             return date
         elif pa.types.is_time(pa_type):
@@ -228,8 +222,7 @@ class ArrowDtype(StorageExtensionDtype):
         try:
             pa_dtype = pa.type_for_alias(base_type)
         except ValueError as err:
-            has_parameters = re.search(r"[\[\(].*[\]\)]", base_type)
-            if has_parameters:
+            if has_parameters := re.search(r"[\[\(].*[\]\)]", base_type):
                 # Fallback to try common temporal types
                 try:
                     return cls._parse_temporal_dtype_string(base_type)
@@ -270,9 +263,7 @@ class ArrowDtype(StorageExtensionDtype):
                 tz = tz[3:]
 
             pa_type = pa.timestamp(unit, tz=tz)
-            dtype = cls(pa_type)
-            return dtype
-
+            return cls(pa_type)
         raise NotImplementedError(string)
 
     @property

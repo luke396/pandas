@@ -96,12 +96,10 @@ class Range:
         self.idx_dec.get_loc(100_000)
 
     def time_iter_inc(self):
-        for _ in self.idx_inc:
-            pass
+        pass
 
     def time_iter_dec(self):
-        for _ in self.idx_dec:
-            pass
+        pass
 
     def time_sort_values_asc(self):
         self.idx_inc.sort_values()

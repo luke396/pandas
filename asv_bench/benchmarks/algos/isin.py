@@ -189,11 +189,11 @@ class IsInFloat64:
     param_names = ["dtype", "title"]
 
     def setup(self, dtype, title):
-        N_many = 10**5
         N_few = 10**6
         self.series = Series([1, 2], dtype=dtype)
 
         if title == "many_different_values":
+            N_many = 10**5
             # runtime is dominated by creation of the lookup-table
             self.values = np.arange(N_many, dtype=np.float64)
         elif title == "few_different_values":

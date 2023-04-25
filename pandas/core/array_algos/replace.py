@@ -139,10 +139,7 @@ def replace_regex(
         # value is guaranteed to be a string here, s can be either a string
         # or null if it's null it gets returned
         def re_replacer(s):
-            if is_re(rx) and isinstance(s, str):
-                return rx.sub(value, s)
-            else:
-                return s
+            return rx.sub(value, s) if is_re(rx) and isinstance(s, str) else s
 
     f = np.vectorize(re_replacer, otypes=[np.object_])
 

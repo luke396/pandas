@@ -128,8 +128,8 @@ def is_bool_indexer(key: Any) -> bool:
             key_array = np.asarray(key)
 
             if not lib.is_bool_array(key_array):
-                na_msg = "Cannot mask with non-boolean array containing NA / NaN values"
                 if lib.infer_dtype(key_array) == "boolean" and isna(key_array).any():
+                    na_msg = "Cannot mask with non-boolean array containing NA / NaN values"
                     # Don't raise on e.g. ["A", "B", np.nan], see
                     #  test_loc_getitem_list_of_labels_categoricalindex_with_na
                     raise ValueError(na_msg)
@@ -289,9 +289,7 @@ def index_labels_to_array(
 
 
 def maybe_make_list(obj):
-    if obj is not None and not isinstance(obj, (tuple, list)):
-        return [obj]
-    return obj
+    return [obj] if obj is not None and not isinstance(obj, (tuple, list)) else obj
 
 
 def maybe_iterable_to_list(obj: Iterable[T] | T) -> Collection[T] | T:
@@ -356,13 +354,7 @@ def get_callable_name(obj):
     if isinstance(obj, partial):
         return get_callable_name(obj.func)
     # fall back to class name
-    if callable(obj):
-        return type(obj).__name__
-    # everything failed (probably because the argument
-    # wasn't actually callable); we return None
-    # instead of the empty string in this case to allow
-    # distinguishing between no name and a name of ''
-    return None
+    return type(obj).__name__ if callable(obj) else None
 
 
 def apply_if_callable(maybe_callable, obj, **kwargs):
@@ -508,15 +500,14 @@ def pipe(
     -------
     object : the return type of ``func``.
     """
-    if isinstance(func, tuple):
-        func, target = func
-        if target in kwargs:
-            msg = f"{target} is both the pipe target and a keyword argument"
-            raise ValueError(msg)
-        kwargs[target] = obj
-        return func(*args, **kwargs)
-    else:
+    if not isinstance(func, tuple):
         return func(obj, *args, **kwargs)
+    func, target = func
+    if target in kwargs:
+        msg = f"{target} is both the pipe target and a keyword argument"
+        raise ValueError(msg)
+    kwargs[target] = obj
+    return func(*args, **kwargs)
 
 
 def get_rename_function(mapper):
@@ -526,10 +517,7 @@ def get_rename_function(mapper):
     """
 
     def f(x):
-        if x in mapper:
-            return mapper[x]
-        else:
-            return x
+        return mapper[x] if x in mapper else x
 
     return f if isinstance(mapper, (abc.Mapping, ABCSeries)) else mapper
 

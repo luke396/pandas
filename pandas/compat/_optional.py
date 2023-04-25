@@ -160,14 +160,14 @@ def import_optional_dependency(
                 f"Pandas requires version '{minimum_version}' or newer of '{parent}' "
                 f"(version '{version}' currently installed)."
             )
-            if errors == "warn":
+            if errors == "raise":
+                raise ImportError(msg)
+
+            elif errors == "warn":
                 warnings.warn(
                     msg,
                     UserWarning,
                     stacklevel=find_stack_level(),
                 )
                 return None
-            elif errors == "raise":
-                raise ImportError(msg)
-
     return module

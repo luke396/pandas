@@ -135,10 +135,7 @@ def _take_nd_ndarray(
         arr, indexer, fill_value, allow_fill
     )
 
-    flip_order = False
-    if arr.ndim == 2 and arr.flags.f_contiguous:
-        flip_order = True
-
+    flip_order = bool(arr.ndim == 2 and arr.flags.f_contiguous)
     if flip_order:
         arr = arr.T
         axis = arr.ndim - axis - 1
@@ -298,10 +295,11 @@ def _get_take_nd_function_cached(
     if ndim == 1:
         func = _take_1d_dict.get(tup, None)
     elif ndim == 2:
-        if axis == 0:
-            func = _take_2d_axis0_dict.get(tup, None)
-        else:
-            func = _take_2d_axis1_dict.get(tup, None)
+        func = (
+            _take_2d_axis0_dict.get(tup, None)
+            if axis == 0
+            else _take_2d_axis1_dict.get(tup, None)
+        )
     if func is not None:
         return func
 

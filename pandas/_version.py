@@ -31,8 +31,7 @@ def get_keywords():
     git_refnames = "$Format:%d$"
     git_full = "$Format:%H$"
     git_date = "$Format:%ci$"
-    keywords = {"refnames": git_refnames, "full": git_full, "date": git_date}
-    return keywords
+    return {"refnames": git_refnames, "full": git_full, "date": git_date}
 
 
 class VersioneerConfig:
@@ -144,8 +143,7 @@ def versions_from_parentdir(parentdir_prefix, root, verbose):
 
     if verbose:
         print(
-            f"Tried directories {str(rootdirs)} \
-            but none started with prefix {parentdir_prefix}"
+            f"Tried directories {rootdirs} \\n        #            but none started with prefix {parentdir_prefix}"
         )
     raise NotThisMethod("rootdir doesn't start with parentdir_prefix")
 
@@ -162,17 +160,14 @@ def git_get_keywords(versionfile_abs):
         with open(versionfile_abs) as fobj:
             for line in fobj:
                 if line.strip().startswith("git_refnames ="):
-                    mo = re.search(r'=\s*"(.*)"', line)
-                    if mo:
-                        keywords["refnames"] = mo.group(1)
+                    if mo := re.search(r'=\s*"(.*)"', line):
+                        keywords["refnames"] = mo[1]
                 if line.strip().startswith("git_full ="):
-                    mo = re.search(r'=\s*"(.*)"', line)
-                    if mo:
-                        keywords["full"] = mo.group(1)
+                    if mo := re.search(r'=\s*"(.*)"', line):
+                        keywords["full"] = mo[1]
                 if line.strip().startswith("git_date ="):
-                    mo = re.search(r'=\s*"(.*)"', line)
-                    if mo:
-                        keywords["date"] = mo.group(1)
+                    if mo := re.search(r'=\s*"(.*)"', line):
+                        keywords["date"] = mo[1]
     except OSError:
         pass
     return keywords
@@ -257,10 +252,7 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, runner=run_command):
     expanded, and _version.py hasn't already been rewritten with a short
     version string, meaning we're inside a checked out source tree.
     """
-    GITS = ["git"]
-    if sys.platform == "win32":
-        GITS = ["git.cmd", "git.exe"]
-
+    GITS = ["git.cmd", "git.exe"] if sys.platform == "win32" else ["git"]
     # GIT_DIR can interfere with correct operation of Versioneer.
     # It may be intended to be passed to the Versioneer-versioned project,
     # but that should not change where we get our version from.
@@ -298,11 +290,7 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, runner=run_command):
         raise NotThisMethod("'git rev-parse' failed")
     full_out = full_out.strip()
 
-    pieces = {}
-    pieces["long"] = full_out
-    pieces["short"] = full_out[:7]  # maybe improved later
-    pieces["error"] = None
-
+    pieces = {"long": full_out, "short": full_out[:7], "error": None}
     branch_name, rc = runner(GITS, ["rev-parse", "--abbrev-ref", "HEAD"], cwd=root)
     # --abbrev-ref was added in git-1.6.3
     if rc != 0 or branch_name is None:
@@ -356,11 +344,10 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, runner=run_command):
             return pieces
 
         # tag
-        full_tag = mo.group(1)
+        full_tag = mo[1]
         if not full_tag.startswith(tag_prefix):
             if verbose:
-                fmt = "tag '%s' doesn't start with prefix '%s'"
-                print(fmt % (full_tag, tag_prefix))
+                print(f"tag '{full_tag}' doesn't start with prefix '{tag_prefix}'")
             pieces[
                 "error"
             ] = f"tag '{full_tag}' doesn't start with prefix '{tag_prefix}'"
@@ -368,10 +355,10 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, runner=run_command):
         pieces["closest-tag"] = full_tag[len(tag_prefix) :]
 
         # distance: number of commits since tag
-        pieces["distance"] = int(mo.group(2))
+        pieces["distance"] = int(mo[2])
 
         # commit: short hex revision ID
-        pieces["short"] = mo.group(3)
+        pieces["short"] = mo[3]
 
     else:
         # HEX: no tags
@@ -391,9 +378,7 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, runner=run_command):
 
 def plus_or_dot(pieces):
     """Return a + if we don't already have one, else return a ."""
-    if "+" in pieces.get("closest-tag", ""):
-        return "."
-    return "+"
+    return "." if "+" in pieces.get("closest-tag", "") else "+"
 
 
 def render_pep440(pieces):
@@ -410,13 +395,11 @@ def render_pep440(pieces):
         if pieces["distance"] or pieces["dirty"]:
             rendered += plus_or_dot(pieces)
             rendered += f"{pieces['distance']}.g{pieces['short']}"
-            if pieces["dirty"]:
-                rendered += ".dirty"
     else:
         # exception #1
         rendered = f"0+untagged.{pieces['distance']}.g{pieces['short']}"
-        if pieces["dirty"]:
-            rendered += ".dirty"
+    if pieces["dirty"]:
+        rendered += ".dirty"
     return rendered
 
 
@@ -436,16 +419,14 @@ def render_pep440_branch(pieces):
                 rendered += ".dev0"
             rendered += plus_or_dot(pieces)
             rendered += f"{pieces['distance']}.g{pieces['short']}"
-            if pieces["dirty"]:
-                rendered += ".dirty"
     else:
         # exception #1
         rendered = "0"
         if pieces["branch"] != "master":
             rendered += ".dev0"
         rendered += f"+untagged.{pieces['distance']}.g{pieces['short']}"
-        if pieces["dirty"]:
-            rendered += ".dirty"
+    if pieces["dirty"]:
+        rendered += ".dirty"
     return rendered
 
 
@@ -526,16 +507,14 @@ def render_pep440_post_branch(pieces):
                 rendered += ".dev0"
             rendered += plus_or_dot(pieces)
             rendered += f"g{pieces['short']}"
-            if pieces["dirty"]:
-                rendered += ".dirty"
     else:
         # exception #1
         rendered = f"0.post{pieces['distance']}"
         if pieces["branch"] != "master":
             rendered += ".dev0"
         rendered += f"+g{pieces['short']}"
-        if pieces["dirty"]:
-            rendered += ".dirty"
+    if pieces["dirty"]:
+        rendered += ".dirty"
     return rendered
 
 
@@ -551,13 +530,11 @@ def render_pep440_old(pieces):
         rendered = pieces["closest-tag"]
         if pieces["distance"] or pieces["dirty"]:
             rendered += f"0.post{pieces['distance']}"
-            if pieces["dirty"]:
-                rendered += ".dev0"
     else:
         # exception #1
         rendered = f"0.post{pieces['distance']}"
-        if pieces["dirty"]:
-            rendered += ".dev0"
+    if pieces["dirty"]:
+        rendered += ".dev0"
     return rendered
 
 

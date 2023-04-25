@@ -84,7 +84,7 @@ class Flags:
 
     @allows_duplicate_labels.setter
     def allows_duplicate_labels(self, value: bool) -> None:
-        value = bool(value)
+        value = value
         obj = self._obj()
         if obj is None:
             raise ValueError("This flag's object has been deleted.")

@@ -121,10 +121,7 @@ def sliding_sum(
         if nobs == 0 == min_periods:
             result = 0.0
         elif nobs >= min_periods:
-            if num_consecutive_same_value >= nobs:
-                result = prev_value * nobs
-            else:
-                result = sum_x
+            result = prev_value * nobs if num_consecutive_same_value >= nobs else sum_x
         else:
             result = np.nan
 

@@ -200,12 +200,8 @@ class PandasArray(  # type: ignore[misc]
         dtype = pandas_dtype(dtype)
 
         if is_dtype_equal(dtype, self.dtype):
-            if copy:
-                return self.copy()
-            return self
-
-        result = astype_array(self._ndarray, dtype=dtype, copy=copy)
-        return result
+            return self.copy() if copy else self
+        return astype_array(self._ndarray, dtype=dtype, copy=copy)
 
     def isna(self) -> np.ndarray:
         return isna(self._ndarray)
@@ -217,10 +213,7 @@ class PandasArray(  # type: ignore[misc]
         return fill_value
 
     def _values_for_factorize(self) -> tuple[np.ndarray, float | None]:
-        if self.dtype.kind in "iub":
-            fv = None
-        else:
-            fv = np.nan
+        fv = None if self.dtype.kind in "iub" else np.nan
         return self._ndarray, fv
 
     # ------------------------------------------------------------------------

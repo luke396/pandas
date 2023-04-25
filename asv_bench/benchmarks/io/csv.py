@@ -132,8 +132,7 @@ class ToCSVIndexes(BaseIO):
         data_cols = {
             f"col{i}": np.random.uniform(0, 100000.0, rows) for i in range(cols)
         }
-        df = DataFrame({**index_cols, **data_cols})
-        return df
+        return DataFrame(index_cols | data_cols)
 
     def setup(self):
         ROWS = 100000
@@ -452,9 +451,6 @@ class ReadCSVMemoryGrowth(BaseIO):
         # see gh-24805.
         result = read_csv(self.fname, chunksize=self.chunksize, engine=engine)
 
-        for _ in result:
-            pass
-
 
 class ReadCSVParseSpecialDate(StringIORewind):
     params = (["mY", "mdY", "hm"], ["c", "python"])
@@ -501,7 +497,7 @@ class ReadCSVMemMapUTF8:
                 continue
             lines.append(line)
         df = DataFrame(lines)
-        df = concat([df for n in range(100)], ignore_index=True)
+        df = concat([df for _ in range(100)], ignore_index=True)
         df.to_csv(self.fname, index=False, header=False, encoding="utf-8")
 
     def time_read_memmapped_utf8(self):

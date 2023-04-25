@@ -93,13 +93,12 @@ def get_indexer_indexer(
         indexer = lexsort_indexer(
             target.codes, orders=ascending, na_position=na_position, codes_given=True
         )
-    else:
-        # Check monotonic-ness before sort an index (GH 11080)
-        if (ascending and target.is_monotonic_increasing) or (
+    elif (ascending and target.is_monotonic_increasing) or (
             not ascending and target.is_monotonic_decreasing
         ):
-            return None
+        return None
 
+    else:
         # ascending can only be a Sequence for MultiIndex
         indexer = nargsort(
             target,
@@ -149,7 +148,7 @@ def get_group_index(
         acc = 1
         for i, mul in enumerate(shape):
             acc *= int(mul)
-            if not acc < lib.i8max:
+            if acc >= lib.i8max:
                 return i
         return len(shape)
 
@@ -364,22 +363,17 @@ def lexsort_indexer(
             n = len(cat.categories)
             codes = cat.codes.copy()
             mask = cat.codes == -1
-            if mask.any():
-                mask_n = n + 1
-            else:
-                mask_n = n
-
+            mask_n = n + 1 if mask.any() else n
         if order:  # ascending
-            if na_position == "last":
-                codes = np.where(mask, n, codes)
-            elif na_position == "first":
+            if na_position == "first":
                 codes += 1
-        else:  # not order means descending
-            if na_position == "last":
-                codes = np.where(mask, n, n - codes - 1)
-            elif na_position == "first":
-                codes = np.where(mask, 0, n - codes)
+            elif na_position == "last":
+                codes = np.where(mask, n, codes)
+        elif na_position == "first":
+            codes = np.where(mask, 0, n - codes)
 
+        elif na_position == "last":
+            codes = np.where(mask, n, n - codes - 1)
         shape.append(mask_n)
         labels.append(codes)
 
@@ -483,10 +477,7 @@ def nargminmax(values: ExtensionArray, method: str, axis: AxisInt = 0):
 
     if arr_values.ndim > 1:
         if mask.any():
-            if axis == 1:
-                zipped = zip(arr_values, mask)
-            else:
-                zipped = zip(arr_values.T, mask.T)
+            zipped = zip(arr_values, mask) if axis == 1 else zip(arr_values.T, mask.T)
             return np.array([_nanargminmax(v, m, func) for v, m in zipped])
         return func(arr_values, axis=axis)
 
@@ -534,11 +525,7 @@ def _ensure_key_mapped_multiindex(
     """
 
     if level is not None:
-        if isinstance(level, (str, int)):
-            sort_levels = [level]
-        else:
-            sort_levels = level
-
+        sort_levels = [level] if isinstance(level, (str, int)) else level
         sort_levels = [index._get_level_number(lev) for lev in sort_levels]
     else:
         sort_levels = list(range(index.nlevels))  # satisfies mypy

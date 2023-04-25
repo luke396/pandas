@@ -38,12 +38,10 @@ def load_reduce(self):
         msg = "_reconstruct: First argument must be a sub-type of ndarray"
 
         if msg in str(err):
-            try:
+            with contextlib.suppress(TypeError):
                 cls = args[0]
                 stack[-1] = object.__new__(cls)
                 return
-            except TypeError:
-                pass
         elif args and isinstance(args[0], type) and issubclass(args[0], BaseOffset):
             # TypeError: object.__new__(Day) is not safe, use Day.__new__()
             cls = args[0]
@@ -190,10 +188,8 @@ def load_newobj_ex(self) -> None:
     self.append(obj)
 
 
-try:
+with contextlib.suppress(AttributeError, KeyError):
     Unpickler.dispatch[pkl.NEWOBJ_EX[0]] = load_newobj_ex
-except (AttributeError, KeyError):
-    pass
 
 
 def load(fh, encoding: str | None = None, is_verbose: bool = False):
@@ -208,10 +204,7 @@ def load(fh, encoding: str | None = None, is_verbose: bool = False):
     """
     try:
         fh.seek(0)
-        if encoding is not None:
-            up = Unpickler(fh, encoding=encoding)
-        else:
-            up = Unpickler(fh)
+        up = Unpickler(fh) if encoding is None else Unpickler(fh, encoding=encoding)
         # "Unpickler" has no attribute "is_verbose"  [attr-defined]
         up.is_verbose = is_verbose  # type: ignore[attr-defined]
 

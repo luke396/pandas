@@ -372,8 +372,7 @@ class SparseFrameAccessor(BaseAccessor, PandasDelegate):
         >>> df.sparse.density
         0.5
         """
-        tmp = np.mean([column.array.density for _, column in self._parent.items()])
-        return tmp
+        return np.mean([column.array.density for _, column in self._parent.items()])
 
     @staticmethod
     def _prep_index(data, index, columns):
@@ -383,15 +382,8 @@ class SparseFrameAccessor(BaseAccessor, PandasDelegate):
         )
 
         N, K = data.shape
-        if index is None:
-            index = default_index(N)
-        else:
-            index = ensure_index(index)
-        if columns is None:
-            columns = default_index(K)
-        else:
-            columns = ensure_index(columns)
-
+        index = default_index(N) if index is None else ensure_index(index)
+        columns = default_index(K) if columns is None else ensure_index(columns)
         if len(columns) != K:
             raise ValueError(f"Column length mismatch: {len(columns)} vs. {K}")
         if len(index) != N:

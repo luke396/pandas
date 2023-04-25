@@ -345,10 +345,9 @@ for old, new in moved_classes:
         x for x in dir(klass) if not x.startswith("_") or x in ("__iter__", "__array__")
     ]
 
-    for method in methods:
-        # ... and each of its public methods
-        moved_api_pages.append((f"{old}.{method}", f"{new}.{method}"))
-
+    moved_api_pages.extend(
+        (f"{old}.{method}", f"{new}.{method}") for method in methods
+    )
 if include_api:
     html_additional_pages = {
         "generated/" + page[0]: "api_redirect.html" for page in moved_api_pages
@@ -583,14 +582,13 @@ class AccessorCallableDocumenter(AccessorLevelDocumenter, MethodDocumenter):
     priority = 0.5
 
     def format_name(self):
-        if sys.version_info < (3, 9):
-            # NOTE pyupgrade will remove this when we run it with --py39-plus
-            # so don't remove the unnecessary `else` statement below
-            from pandas.util._str_methods import removesuffix
-
-            return removesuffix(MethodDocumenter.format_name(self), ".__call__")
-        else:
+        if sys.version_info >= (3, 9):
             return MethodDocumenter.format_name(self).removesuffix(".__call__")
+        # NOTE pyupgrade will remove this when we run it with --py39-plus
+        # so don't remove the unnecessary `else` statement below
+        from pandas.util._str_methods import removesuffix
+
+        return removesuffix(MethodDocumenter.format_name(self), ".__call__")
 
 
 class PandasAutosummary(Autosummary):
@@ -679,11 +677,7 @@ def linkcode_resolve(domain, info):
     except OSError:
         lineno = None
 
-    if lineno:
-        linespec = f"#L{lineno}-L{lineno + len(source) - 1}"
-    else:
-        linespec = ""
-
+    linespec = f"#L{lineno}-L{lineno + len(source) - 1}" if lineno else ""
     fn = os.path.relpath(fn, start=os.path.dirname(pandas.__file__))
 
     if "+" in pandas.__version__:

@@ -15,5 +15,4 @@ class TimeImport:
 
         line = p.stderr.splitlines()[-1]
         field = line.split(b"|")[-2].strip()
-        total = int(field)  # microseconds
-        return total
+        return int(field)

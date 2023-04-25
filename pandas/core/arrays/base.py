@@ -421,20 +421,16 @@ class ExtensionArray:
         """
         Return for `item in self`.
         """
-        # GH37867
-        # comparisons of any item to pd.NA always return pd.NA, so e.g. "a" in [pd.NA]
-        # would raise a TypeError. The implementation below works around that.
-        if is_scalar(item) and isna(item):
-            if not self._can_hold_na:
-                return False
-            elif item is self.dtype.na_value or isinstance(item, self.dtype.type):
-                return self._hasna
-            else:
-                return False
-        else:
+        if not is_scalar(item) or not isna(item):
             # error: Item "ExtensionArray" of "Union[ExtensionArray, ndarray]" has no
             # attribute "any"
             return (item == self).any()  # type: ignore[union-attr]
+        if not self._can_hold_na:
+            return False
+        elif item is self.dtype.na_value or isinstance(item, self.dtype.type):
+            return self._hasna
+        else:
+            return False
 
     # error: Signature of "__eq__" incompatible with supertype "object"
     def __eq__(self, other: Any) -> ArrayLike:  # type: ignore[override]
@@ -573,11 +569,7 @@ class ExtensionArray:
 
         dtype = pandas_dtype(dtype)
         if is_dtype_equal(dtype, self.dtype):
-            if not copy:
-                return self
-            else:
-                return self.copy()
-
+            return self.copy() if copy else self
         if isinstance(dtype, ExtensionDtype):
             cls = dtype.construct_array_type()
             return cls._from_sequence(self, dtype=dtype, copy=copy)
@@ -1304,9 +1296,7 @@ class ExtensionArray:
             when ``boxed=False`` and :func:`str` is used when
             ``boxed=True``.
         """
-        if boxed:
-            return str
-        return repr
+        return str if boxed else repr
 
     # ------------------------------------------------------------------------
     # Reshaping
@@ -1483,9 +1473,7 @@ class ExtensionArray:
         -------
         list
         """
-        if self.ndim > 1:
-            return [x.tolist() for x in self]
-        return list(self)
+        return [x.tolist() for x in self] if self.ndim > 1 else list(self)
 
     def delete(self, loc: PositionalIndexer) -> Self:
         indexer = np.delete(np.arange(len(self)), loc)
@@ -1539,11 +1527,7 @@ class ExtensionArray:
         'value' should either be a scalar or an arraylike with the same length
         as self.
         """
-        if is_list_like(value):
-            val = value[mask]
-        else:
-            val = value
-
+        val = value[mask] if is_list_like(value) else value
         self[mask] = val
 
     def _where(self, mask: npt.NDArray[np.bool_], value) -> Self:
@@ -1561,11 +1545,7 @@ class ExtensionArray:
         """
         result = self.copy()
 
-        if is_list_like(value):
-            val = value[~mask]
-        else:
-            val = value
-
+        val = value[~mask] if is_list_like(value) else value
         result[~mask] = val
         return result
 

@@ -69,7 +69,7 @@ LOCAL_TAG = "__pd_eval_local_"
 
 class Term:
     def __new__(cls, name, env, side=None, encoding=None):
-        klass = Constant if not isinstance(name, str) else cls
+        klass = cls if isinstance(name, str) else Constant
         # error: Argument 2 for "super" not an instance of argument 1
         supr_new = super(Term, klass).__new__  # type: ignore[misc]
         return supr_new(klass)
@@ -327,7 +327,7 @@ _special_case_arith_ops_dict = dict(
 _binary_ops_dict = {}
 
 for d in (_cmp_ops_dict, _bool_ops_dict, _arith_ops_dict):
-    _binary_ops_dict.update(d)
+    _binary_ops_dict |= d
 
 
 def _cast_inplace(terms, acceptable_dtypes, dtype) -> None:
@@ -491,21 +491,18 @@ class BinOp(Op):
 
     def _disallow_scalar_only_bool_ops(self):
         rhs = self.rhs
-        lhs = self.lhs
-
         # GH#24883 unwrap dtype if necessary to ensure we have a type object
         rhs_rt = rhs.return_type
         rhs_rt = getattr(rhs_rt, "type", rhs_rt)
+        lhs = self.lhs
         lhs_rt = lhs.return_type
         lhs_rt = getattr(lhs_rt, "type", lhs_rt)
         if (
             (lhs.is_scalar or rhs.is_scalar)
             and self.op in _bool_ops_dict
             and (
-                not (
-                    issubclass(rhs_rt, (bool, np.bool_))
-                    and issubclass(lhs_rt, (bool, np.bool_))
-                )
+                not issubclass(rhs_rt, (bool, np.bool_))
+                or not issubclass(lhs_rt, (bool, np.bool_))
             )
         ):
             raise NotImplementedError("cannot evaluate scalar only bool ops")

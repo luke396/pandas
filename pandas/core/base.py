@@ -129,8 +129,7 @@ class PandasObject(DirNamesMixin):
         Generates the total memory usage for an object that returns
         either a value or Series of values
         """
-        memory_usage = getattr(self, "memory_usage", None)
-        if memory_usage:
+        if memory_usage := getattr(self, "memory_usage", None):
             mem = memory_usage(deep=True)  # pylint: disable=not-callable
             return int(mem if is_scalar(mem) else mem.sum())
 
@@ -187,11 +186,13 @@ class SelectionMixin(Generic[NDFrameT]):
     @final
     @property
     def _selection_list(self):
-        if not isinstance(
-            self._selection, (list, tuple, ABCSeries, ABCIndex, np.ndarray)
-        ):
-            return [self._selection]
-        return self._selection
+        return (
+            self._selection
+            if isinstance(
+                self._selection, (list, tuple, ABCSeries, ABCIndex, np.ndarray)
+            )
+            else [self._selection]
+        )
 
     @cache_readonly
     def _selected_obj(self):
@@ -580,26 +581,26 @@ class IndexOpsMixin(OpsMixin):
 
         values = self._values
         if fillna:
-            if not can_hold_element(values, na_value):
-                # if we can't hold the na_value asarray either makes a copy or we
-                # error before modifying values. The asarray later on thus won't make
-                # another copy
-                values = np.asarray(values, dtype=dtype)
-            else:
-                values = values.copy()
-
+            values = (
+                values.copy()
+                if can_hold_element(values, na_value)
+                else np.asarray(values, dtype=dtype)
+            )
             values[np.asanyarray(isna(self))] = na_value
 
         result = np.asarray(values, dtype=dtype)
 
-        if (copy and not fillna) or (not copy and using_copy_on_write()):
-            if np.shares_memory(self._values[:2], result[:2]):
-                # Take slices to improve performance of check
-                if using_copy_on_write() and not copy:
-                    result = result.view()
-                    result.flags.writeable = False
-                else:
-                    result = result.copy()
+        if (
+            (copy and not fillna)
+            or (not copy and using_copy_on_write())
+            and np.shares_memory(self._values[:2], result[:2])
+        ):
+            # Take slices to improve performance of check
+            if using_copy_on_write() and not copy:
+                result = result.view()
+                result.flags.writeable = False
+            else:
+                result = result.copy()
 
         return result
 
@@ -667,10 +668,7 @@ class IndexOpsMixin(OpsMixin):
         skipna = nv.validate_argmax_with_skipna(skipna, args, kwargs)
 
         if isinstance(delegate, ExtensionArray):
-            if not skipna and delegate.isna().any():
-                return -1
-            else:
-                return delegate.argmax()
+            return -1 if not skipna and delegate.isna().any() else delegate.argmax()
         else:
             # error: Incompatible return value type (got "Union[int, ndarray]", expected
             # "int")
@@ -687,10 +685,7 @@ class IndexOpsMixin(OpsMixin):
         skipna = nv.validate_argmin_with_skipna(skipna, args, kwargs)
 
         if isinstance(delegate, ExtensionArray):
-            if not skipna and delegate.isna().any():
-                return -1
-            else:
-                return delegate.argmin()
+            return -1 if not skipna and delegate.isna().any() else delegate.argmin()
         else:
             # error: Incompatible return value type (got "Union[int, ndarray]", expected
             # "int")
@@ -738,11 +733,11 @@ class IndexOpsMixin(OpsMixin):
         iterator
         """
         # We are explicitly making element iterators.
-        if not isinstance(self._values, np.ndarray):
-            # Check type instead of dtype to catch DTA/TDA
-            return iter(self._values)
-        else:
-            return map(self._values.item, range(self._values.size))
+        return (
+            map(self._values.item, range(self._values.size))
+            if isinstance(self._values, np.ndarray)
+            else iter(self._values)
+        )
 
     @cache_readonly
     def hasnans(self) -> bool:
@@ -901,12 +896,11 @@ class IndexOpsMixin(OpsMixin):
 
     def unique(self):
         values = self._values
-        if not isinstance(values, np.ndarray):
-            # i.e. ExtensionArray
-            result = values.unique()
-        else:
-            result = algorithms.unique1d(values)
-        return result
+        return (
+            algorithms.unique1d(values)
+            if isinstance(values, np.ndarray)
+            else values.unique()
+        )
 
     @final
     def nunique(self, dropna: bool = True) -> int:
@@ -1194,15 +1188,15 @@ class IndexOpsMixin(OpsMixin):
             raise ValueError(msg)
 
         values = self._values
-        if not isinstance(values, np.ndarray):
-            # Going through EA.searchsorted directly improves performance GH#38083
-            return values.searchsorted(value, side=side, sorter=sorter)
-
-        return algorithms.searchsorted(
-            values,
-            value,
-            side=side,
-            sorter=sorter,
+        return (
+            algorithms.searchsorted(
+                values,
+                value,
+                side=side,
+                sorter=sorter,
+            )
+            if isinstance(values, np.ndarray)
+            else values.searchsorted(value, side=side, sorter=sorter)
         )
 
     def drop_duplicates(self, *, keep: DropKeep = "first"):

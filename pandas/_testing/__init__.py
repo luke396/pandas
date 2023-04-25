@@ -456,7 +456,7 @@ def makeMultiIndex(k: int = 10, names=None, **kwargs):
 
 
 def index_subclass_makers_generator():
-    make_index_funcs = [
+    yield from [
         makeDateIndex,
         makePeriodIndex,
         makeTimedeltaIndex,
@@ -465,7 +465,6 @@ def index_subclass_makers_generator():
         makeCategoricalIndex,
         makeMultiIndex,
     ]
-    yield from make_index_funcs
 
 
 def all_timeseries_index_generator(k: int = 10) -> Iterable[Index]:
@@ -883,9 +882,7 @@ def _make_skipna_wrapper(alternative, skipna_alternative=None):
 
         def skipna_wrapper(x):
             nona = x.dropna()
-            if len(nona) == 0:
-                return np.nan
-            return alternative(nona)
+            return np.nan if len(nona) == 0 else alternative(nona)
 
     return skipna_wrapper
 

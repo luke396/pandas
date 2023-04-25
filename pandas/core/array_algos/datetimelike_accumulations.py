@@ -50,9 +50,7 @@ def _cum_func(
     result = func(y)
     result[mask] = iNaT
 
-    if values.dtype.kind in "mM":
-        return result.view(values.dtype.base)
-    return result
+    return result.view(values.dtype.base) if values.dtype.kind in "mM" else result
 
 
 def cumsum(values: np.ndarray, *, skipna: bool = True) -> np.ndarray:

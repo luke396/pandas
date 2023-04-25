@@ -150,7 +150,7 @@ def ensure_safe_environment_variables() -> Generator[None, None, None]:
         yield
     finally:
         os.environ.clear()
-        os.environ.update(saved_environ)
+        os.environ |= saved_environ
 
 
 @contextmanager

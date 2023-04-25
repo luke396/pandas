@@ -150,10 +150,8 @@ def _astype_float_to_int_nansafe(
         raise IntCastingNaNError(
             "Cannot convert non-finite values (NA or inf) to integer"
         )
-    if dtype.kind == "u":
-        # GH#45151
-        if not (values >= 0).all():
-            raise ValueError(f"Cannot losslessly cast from {values.dtype} to {dtype}")
+    if dtype.kind == "u" and not (values >= 0).all():
+        raise ValueError(f"Cannot losslessly cast from {values.dtype} to {dtype}")
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning)
         return values.astype(dtype, copy=copy)
@@ -175,17 +173,12 @@ def astype_array(values: ArrayLike, dtype: DtypeObj, copy: bool = False) -> Arra
     ndarray or ExtensionArray
     """
     if is_dtype_equal(values.dtype, dtype):
-        if copy:
-            return values.copy()
-        return values
-
-    if not isinstance(values, np.ndarray):
-        # i.e. ExtensionArray
-        values = values.astype(dtype, copy=copy)
-
-    else:
-        values = _astype_nansafe(values, dtype, copy=copy)
-
+        return values.copy() if copy else values
+    values = (
+        _astype_nansafe(values, dtype, copy=copy)
+        if isinstance(values, np.ndarray)
+        else values.astype(dtype, copy=copy)
+    )
     # in pandas we don't store numpy str dtypes, so convert to object
     if isinstance(dtype, np.dtype) and issubclass(values.dtype.type, str):
         values = np.array(values, dtype=object)

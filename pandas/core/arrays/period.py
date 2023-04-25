@@ -271,11 +271,7 @@ class PeriodArray(dtl.DatelikeOps, libperiod.PeriodMixin):  # type: ignore[misc]
     ) -> Self:
         if dtype is not None:
             dtype = pandas_dtype(dtype)
-        if dtype and isinstance(dtype, PeriodDtype):
-            freq = dtype.freq
-        else:
-            freq = None
-
+        freq = dtype.freq if dtype and isinstance(dtype, PeriodDtype) else None
         if isinstance(scalars, cls):
             validate_dtype_freq(scalars.dtype, freq)
             if copy:
@@ -537,20 +533,19 @@ class PeriodArray(dtl.DatelikeOps, libperiod.PeriodMixin):  # type: ignore[misc]
         new_data = libperiod.periodarr_to_dt64arr(new_parr.asi8, base)
         dta = DatetimeArray(new_data)
 
-        if self.freq.name == "B":
-            # See if we can retain BDay instead of Day in cases where
-            #  len(self) is too small for infer_freq to distinguish between them
-            diffs = libalgos.unique_deltas(self.asi8)
-            if len(diffs) == 1:
-                diff = diffs[0]
-                if diff == self.dtype._n:
-                    dta._freq = self.freq
-                elif diff == 1:
-                    dta._freq = self.freq.base
-                # TODO: other cases?
-            return dta
-        else:
+        if self.freq.name != "B":
             return dta._with_freq("infer")
+        # See if we can retain BDay instead of Day in cases where
+        #  len(self) is too small for infer_freq to distinguish between them
+        diffs = libalgos.unique_deltas(self.asi8)
+        if len(diffs) == 1:
+            diff = diffs[0]
+            if diff == self.dtype._n:
+                dta._freq = self.freq
+            elif diff == 1:
+                dta._freq = self.freq.base
+            # TODO: other cases?
+        return dta
 
     # --------------------------------------------------------------------
 
@@ -613,11 +608,7 @@ class PeriodArray(dtl.DatelikeOps, libperiod.PeriodMixin):  # type: ignore[misc]
         asi8 = self.asi8
         # self.freq.n can't be negative or 0
         end = how == "E"
-        if end:
-            ordinal = asi8 + self.dtype._n - 1
-        else:
-            ordinal = asi8
-
+        ordinal = asi8 + self.dtype._n - 1 if end else asi8
         new_data = period_asfreq_arr(ordinal, base1, base2, end)
 
         if self._hasna:
@@ -630,9 +621,7 @@ class PeriodArray(dtl.DatelikeOps, libperiod.PeriodMixin):  # type: ignore[misc]
     # Rendering Methods
 
     def _formatter(self, boxed: bool = False):
-        if boxed:
-            return str
-        return "'{}'".format
+        return str if boxed else "'{}'".format
 
     def _format_native_types(
         self, *, na_rep: str | float = "NaT", date_format=None, **kwargs
@@ -651,10 +640,7 @@ class PeriodArray(dtl.DatelikeOps, libperiod.PeriodMixin):  # type: ignore[misc]
         # Our parent handles everything else.
         dtype = pandas_dtype(dtype)
         if is_dtype_equal(dtype, self._dtype):
-            if not copy:
-                return self
-            else:
-                return self.copy()
+            return self.copy() if copy else self
         if isinstance(dtype, PeriodDtype):
             return self.asfreq(dtype.freq)
 
@@ -920,9 +906,7 @@ def period_array(
     if isinstance(data_dtype, PeriodDtype):
         out = PeriodArray(data)
         if freq is not None:
-            if freq == data_dtype.freq:
-                return out
-            return out.asfreq(freq)
+            return out if freq == data_dtype.freq else out.asfreq(freq)
         return out
 
     # other iterable of some kind
@@ -932,11 +916,7 @@ def period_array(
     arrdata = np.asarray(data)
 
     dtype: PeriodDtype | None
-    if freq:
-        dtype = PeriodDtype(freq)
-    else:
-        dtype = None
-
+    dtype = PeriodDtype(freq) if freq else None
     if is_float_dtype(arrdata) and len(arrdata) > 0:
         raise TypeError("PeriodIndex does not allow floating point in construction")
 
@@ -1131,9 +1111,10 @@ def _range_from_fields(
         freq = to_offset(freq)
         base = libperiod.freq_to_dtype_code(freq)
         arrays = _make_field_arrays(year, month, day, hour, minute, second)
-        for y, mth, d, h, mn, s in zip(*arrays):
-            ordinals.append(libperiod.period_ordinal(y, mth, d, h, mn, s, 0, 0, base))
-
+        ordinals.extend(
+            libperiod.period_ordinal(y, mth, d, h, mn, s, 0, 0, base)
+            for y, mth, d, h, mn, s in zip(*arrays)
+        )
     return np.array(ordinals, dtype=np.int64), freq
 
 

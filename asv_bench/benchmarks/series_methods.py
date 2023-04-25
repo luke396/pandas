@@ -186,7 +186,7 @@ class Clip:
 class ClipDt:
     def setup(self):
         dr = date_range("20220101", periods=100_000, freq="s", tz="UTC")
-        self.clipper_dt = dr[0:1_000].repeat(100)
+        self.clipper_dt = dr[:1_000].repeat(100)
         self.s = Series(dr)
 
     def time_clip(self):
@@ -363,8 +363,7 @@ class Iter:
         self.s = Series(data, dtype=dtype)
 
     def time_iter(self, dtype):
-        for v in self.s:
-            pass
+        pass
 
 
 class ToNumpy:

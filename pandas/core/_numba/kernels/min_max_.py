@@ -29,11 +29,7 @@ def sliding_min_max(
     W: list = []
     for i in range(N):
         curr_win_size = end[i] - start[i]
-        if i == 0:
-            st = start[i]
-        else:
-            st = end[i - 1]
-
+        st = start[i] if i == 0 else end[i - 1]
         for k in range(st, end[i]):
             ai = values[k]
             if not np.isnan(ai):

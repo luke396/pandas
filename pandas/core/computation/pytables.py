@@ -59,10 +59,7 @@ class Term(ops.Term):
     env: PyTablesScope
 
     def __new__(cls, name, env, side=None, encoding=None):
-        if isinstance(name, str):
-            klass = cls
-        else:
-            klass = Constant
+        klass = cls if isinstance(name, str) else Constant
         return object.__new__(klass)
 
     def __init__(self, name, env: PyTablesScope, side=None, encoding=None) -> None:
@@ -218,19 +215,13 @@ class BinOp(ops.BinOp):
                 v = v.tz_convert("UTC")
             return TermValue(v, v._value, kind)
         elif kind in ("timedelta64", "timedelta"):
-            if isinstance(v, str):
-                v = Timedelta(v)
-            else:
-                v = Timedelta(v, unit="s")
+            v = Timedelta(v) if isinstance(v, str) else Timedelta(v, unit="s")
             v = v.as_unit("ns")._value
             return TermValue(int(v), v, kind)
         elif meta == "category":
             metadata = extract_array(self.metadata, extract_numpy=True)
             result: npt.NDArray[np.intp] | np.intp | int
-            if v not in metadata:
-                result = -1
-            else:
-                result = metadata.searchsorted(v, side="left")
+            result = -1 if v not in metadata else metadata.searchsorted(v, side="left")
             return TermValue(result, result, "integer")
         elif kind == "integer":
             v = int(float(v))
@@ -359,14 +350,11 @@ class ConditionBinOp(BinOp):
 
         # equality conditions
         if self.op in ["==", "!="]:
-            # too many values to create the expression?
-            if len(values) <= self._max_selectors:
-                vs = [self.generate(v) for v in values]
-                self.condition = f"({' | '.join(vs)})"
-
-            # use a filter after reading
-            else:
+            if len(values) > self._max_selectors:
                 return None
+            vs = [self.generate(v) for v in values]
+            self.condition = f"({' | '.join(vs)})"
+
         else:
             self.condition = self.generate(values[0])
 
@@ -625,14 +613,12 @@ class TermValue:
 
     def tostring(self, encoding) -> str:
         """quote the string if not encoded else encode and return"""
-        if self.kind == "string":
-            if encoding is not None:
-                return str(self.converted)
-            return f'"{self.converted}"'
-        elif self.kind == "float":
+        if self.kind == "float":
             # python 2 str(float) is not always
             # round-trippable so use repr()
             return repr(self.converted)
+        elif self.kind == "string":
+            return str(self.converted) if encoding is not None else f'"{self.converted}"'
         return str(self.converted)
 
 

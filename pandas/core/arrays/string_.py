@@ -179,10 +179,7 @@ class StringDtype(StorageExtensionDtype):
         """
         from pandas.core.arrays.string_arrow import ArrowStringArray
 
-        if self.storage == "python":
-            return StringArray
-        else:
-            return ArrowStringArray
+        return StringArray if self.storage == "python" else ArrowStringArray
 
     def __from_arrow__(
         self, array: pyarrow.Array | pyarrow.ChunkedArray
@@ -197,12 +194,7 @@ class StringDtype(StorageExtensionDtype):
         else:
             import pyarrow
 
-            if isinstance(array, pyarrow.Array):
-                chunks = [array]
-            else:
-                # pyarrow.ChunkedArray
-                chunks = array.chunks
-
+            chunks = [array] if isinstance(array, pyarrow.Array) else array.chunks
         if len(chunks) == 0:
             arr = np.array([], dtype=object)
         else:
@@ -225,9 +217,7 @@ class BaseStringArray(ExtensionArray):
 
     @doc(ExtensionArray.tolist)
     def tolist(self):
-        if self.ndim > 1:
-            return [x.tolist() for x in self]
-        return list(self.to_numpy())
+        return [x.tolist() for x in self] if self.ndim > 1 else list(self.to_numpy())
 
 
 # error: Definition of "_concat_same_type" in base class "NDArrayBacked" is
@@ -445,10 +435,7 @@ class StringArray(BaseStringArray, PandasArray):  # type: ignore[misc]
         dtype = pandas_dtype(dtype)
 
         if is_dtype_equal(dtype, self.dtype):
-            if copy:
-                return self.copy()
-            return self
-
+            return self.copy() if copy else self
         elif isinstance(dtype, IntegerDtype):
             arr = self._ndarray.copy()
             mask = self.isna()
@@ -477,7 +464,7 @@ class StringArray(BaseStringArray, PandasArray):  # type: ignore[misc]
     def _reduce(
         self, name: str, *, skipna: bool = True, axis: AxisInt | None = 0, **kwargs
     ):
-        if name in ["min", "max"]:
+        if name in {"min", "max"}:
             return getattr(self, name)(skipna=skipna, axis=axis)
 
         raise TypeError(f"Cannot perform reduction '{name}' with string dtype")
@@ -505,9 +492,7 @@ class StringArray(BaseStringArray, PandasArray):  # type: ignore[misc]
 
     def memory_usage(self, deep: bool = False) -> int:
         result = self._ndarray.nbytes
-        if deep:
-            return result + lib.memory_usage_of_objects(self._ndarray)
-        return result
+        return result + lib.memory_usage_of_objects(self._ndarray) if deep else result
 
     @doc(ExtensionArray.searchsorted)
     def searchsorted(
@@ -576,11 +561,7 @@ class StringArray(BaseStringArray, PandasArray):  # type: ignore[misc]
 
         if is_integer_dtype(dtype) or is_bool_dtype(dtype):
             constructor: type[IntegerArray] | type[BooleanArray]
-            if is_integer_dtype(dtype):
-                constructor = IntegerArray
-            else:
-                constructor = BooleanArray
-
+            constructor = IntegerArray if is_integer_dtype(dtype) else BooleanArray
             na_value_is_na = isna(na_value)
             if na_value_is_na:
                 na_value = 1

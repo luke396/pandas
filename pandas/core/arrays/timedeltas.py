@@ -292,12 +292,11 @@ class TimedeltaArray(dtl.TimelikeOps):
         if end is not None:
             end = Timedelta(end).as_unit("ns")
 
-        if unit is not None:
-            if unit not in ["s", "ms", "us", "ns"]:
-                raise ValueError("'unit' must be one of 's', 'ms', 'us', 'ns'")
-        else:
+        if unit is None:
             unit = "ns"
 
+        elif unit not in ["s", "ms", "us", "ns"]:
+            raise ValueError("'unit' must be one of 's', 'ms', 'us', 'ns'")
         if start is not None and unit is not None:
             start = start.as_unit(unit, round_ok=False)
         if end is not None and unit is not None:
@@ -349,22 +348,18 @@ class TimedeltaArray(dtl.TimelikeOps):
 
         if isinstance(dtype, np.dtype) and dtype.kind == "m":
             if dtype == self.dtype:
-                if copy:
-                    return self.copy()
-                return self
-
-            if is_supported_unit(get_unit_from_dtype(dtype)):
-                # unit conversion e.g. timedelta64[s]
-                res_values = astype_overflowsafe(self._ndarray, dtype, copy=False)
-                return type(self)._simple_new(
-                    res_values, dtype=res_values.dtype, freq=self.freq
-                )
-            else:
+                return self.copy() if copy else self
+            if not is_supported_unit(get_unit_from_dtype(dtype)):
                 raise ValueError(
                     f"Cannot convert from {self.dtype} to {dtype}. "
                     "Supported resolutions are 's', 'ms', 'us', 'ns'"
                 )
 
+            # unit conversion e.g. timedelta64[s]
+            res_values = astype_overflowsafe(self._ndarray, dtype, copy=False)
+            return type(self)._simple_new(
+                res_values, dtype=res_values.dtype, freq=self.freq
+            )
         return dtl.DatetimeLikeArrayMixin.astype(self, dtype, copy=copy)
 
     def __iter__(self) -> Iterator:
@@ -380,8 +375,7 @@ class TimedeltaArray(dtl.TimelikeOps):
             for i in range(chunks):
                 start_i = i * chunksize
                 end_i = min((i + 1) * chunksize, length)
-                converted = ints_to_pytimedelta(data[start_i:end_i], box=True)
-                yield from converted
+                yield from ints_to_pytimedelta(data[start_i:end_i], box=True)
 
     # ----------------------------------------------------------------
     # Reductions
@@ -591,19 +585,15 @@ class TimedeltaArray(dtl.TimelikeOps):
         ):
             return self._vector_divlike_op(other, op)
 
-        if is_object_dtype(other.dtype):
-            other = np.asarray(other)
-            if self.ndim > 1:
-                res_cols = [left / right for left, right in zip(self, other)]
-                res_cols2 = [x.reshape(1, -1) for x in res_cols]
-                result = np.concatenate(res_cols2, axis=0)
-            else:
-                result = truediv_object_array(self._ndarray, other)
-
-            return result
-
-        else:
+        if not is_object_dtype(other.dtype):
             return NotImplemented
+        other = np.asarray(other)
+        if self.ndim <= 1:
+            return truediv_object_array(self._ndarray, other)
+
+        res_cols = [left / right for left, right in zip(self, other)]
+        res_cols2 = [x.reshape(1, -1) for x in res_cols]
+        return np.concatenate(res_cols2, axis=0)
 
     @unpack_zerodim_and_defer("__rtruediv__")
     def __rtruediv__(self, other):
@@ -667,9 +657,7 @@ class TimedeltaArray(dtl.TimelikeOps):
 
         elif is_object_dtype(other.dtype):
             result_list = [other[n] // self[n] for n in range(len(self))]
-            result = np.array(result_list)
-            return result
-
+            return np.array(result_list)
         else:
             return NotImplemented
 
@@ -708,9 +696,7 @@ class TimedeltaArray(dtl.TimelikeOps):
         return res1, res2
 
     def __neg__(self) -> TimedeltaArray:
-        freq = None
-        if self.freq is not None:
-            freq = -self.freq
+        freq = -self.freq if self.freq is not None else None
         return type(self)._simple_new(-self._ndarray, dtype=self.dtype, freq=freq)
 
     def __pos__(self) -> TimedeltaArray:
@@ -834,9 +820,7 @@ class TimedeltaArray(dtl.TimelikeOps):
         if hasnans:
 
             def f(x):
-                if isna(x):
-                    return [np.nan] * len(columns)
-                return x.components
+                return [np.nan] * len(columns) if isna(x) else x.components
 
         else:
 
@@ -891,7 +875,6 @@ def sequence_to_td64ns(
     """
     assert unit not in ["Y", "y", "M"]  # caller is responsible for checking
 
-    inferred_freq = None
     if unit is not None:
         unit = parse_timedelta_unit(unit)
 
@@ -899,9 +882,7 @@ def sequence_to_td64ns(
         data, copy, cls_name="TimedeltaArray"
     )
 
-    if isinstance(data, TimedeltaArray):
-        inferred_freq = data.freq
-
+    inferred_freq = data.freq if isinstance(data, TimedeltaArray) else None
     # Convert whatever we have into timedelta64[ns] dtype
     if is_object_dtype(data.dtype) or is_string_dtype(data.dtype):
         # no need to make a copy, need to convert if string-dtyped

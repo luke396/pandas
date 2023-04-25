@@ -196,7 +196,7 @@ def _is_unexpected_warning(
     if actual_warning and not expected_warning:
         return True
     expected_warning = cast(Type[Warning], expected_warning)
-    return bool(not issubclass(actual_warning.category, expected_warning))
+    return not issubclass(actual_warning.category, expected_warning)
 
 
 def _assert_raised_with_correct_stacklevel(

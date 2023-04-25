@@ -74,10 +74,11 @@ def _filter_special_cases(f) -> Callable[[F], F]:
         term_values = (term.value for term in terms)
 
         # we don't have any pandas objects
-        if not _any_pandas_objects(terms):
-            return result_type_many(*term_values), None
-
-        return f(terms)
+        return (
+            f(terms)
+            if _any_pandas_objects(terms)
+            else (result_type_many(*term_values), None)
+        )
 
     return wrapper
 

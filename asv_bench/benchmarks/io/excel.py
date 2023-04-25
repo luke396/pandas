@@ -90,19 +90,13 @@ class ReadExcel:
         self._create_odf()
 
     def time_read_excel(self, engine):
-        if engine == "odf":
-            fname = self.fname_odf
-        else:
-            fname = self.fname_excel
+        fname = self.fname_odf if engine == "odf" else self.fname_excel
         read_excel(fname, engine=engine)
 
 
 class ReadExcelNRows(ReadExcel):
     def time_read_excel(self, engine):
-        if engine == "odf":
-            fname = self.fname_odf
-        else:
-            fname = self.fname_excel
+        fname = self.fname_odf if engine == "odf" else self.fname_excel
         read_excel(fname, engine=engine, nrows=10)
 
 

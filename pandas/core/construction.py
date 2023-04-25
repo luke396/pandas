@@ -317,11 +317,7 @@ def array(
     if isinstance(data, ExtensionArray) and (
         dtype is None or is_dtype_equal(dtype, data.dtype)
     ):
-        # e.g. TimedeltaArray[s], avoid casting to PandasArray
-        if copy:
-            return data.copy()
-        return data
-
+        return data.copy() if copy else data
     if is_extension_array_dtype(dtype):
         cls = cast(ExtensionDtype, dtype).construct_array_type()
         return cls._from_sequence(data, dtype=dtype, copy=copy)
@@ -453,13 +449,8 @@ def extract_array(
     """
     typ = getattr(obj, "_typ", None)
     if typ in _typs:
-        # i.e. isinstance(obj, (ABCIndex, ABCSeries))
         if typ == "rangeindex":
-            if extract_range:
-                # error: "T" has no attribute "_values"
-                return obj._values  # type: ignore[attr-defined]
-            return obj
-
+            return obj._values if extract_range else obj
         # error: "T" has no attribute "_values"
         return obj._values  # type: ignore[attr-defined]
 
@@ -574,7 +565,6 @@ def sanitize_array(
         cls = dtype.construct_array_type()
         subarr = cls._from_sequence(data, dtype=dtype, copy=copy)
 
-    # GH#846
     elif isinstance(data, np.ndarray):
         if isinstance(data, np.matrix):
             data = data.A
@@ -607,7 +597,7 @@ def sanitize_array(
         # materialize e.g. generators, convert e.g. tuples, abc.ValueView
         data = list(data)
 
-        if len(data) == 0 and dtype is None:
+        if not data and dtype is None:
             # We default to float64, matching numpy
             subarr = np.array([], dtype=np.float64)
 
@@ -705,14 +695,10 @@ def _sanitize_str_dtypes(
 
     # This is to prevent mixed-type Series getting all casted to
     # NumPy string type, e.g. NaN --> '-1#IND'.
-    if issubclass(result.dtype.type, str):
-        # GH#16605
-        # If not empty convert the data to dtype
-        # GH#19853: If data is a scalar, result has already the result
-        if not lib.is_scalar(data):
-            if not np.all(isna(data)):
-                data = np.array(data, dtype=dtype, copy=False)
-            result = np.array(data, dtype=object, copy=copy)
+    if issubclass(result.dtype.type, str) and not lib.is_scalar(data):
+        if not np.all(isna(data)):
+            data = np.array(data, dtype=dtype, copy=False)
+        result = np.array(data, dtype=object, copy=copy)
     return result
 
 
@@ -721,9 +707,8 @@ def _maybe_repeat(arr: ArrayLike, index: Index | None) -> ArrayLike:
     If we have a length-1 array and an index describing how long we expect
     the result to be, repeat the array.
     """
-    if index is not None:
-        if 1 == len(arr) != len(index):
-            arr = arr.repeat(len(index))
+    if index is not None and 1 == len(arr) != len(index):
+        arr = arr.repeat(len(index))
     return arr
 
 
@@ -750,11 +735,11 @@ def _try_cast(
     is_ndarray = isinstance(arr, np.ndarray)
 
     if is_object_dtype(dtype):
-        if not is_ndarray:
-            subarr = construct_1d_object_array_from_listlike(arr)
-            return subarr
-        return ensure_wrapped_if_datetimelike(arr).astype(dtype, copy=copy)
-
+        return (
+            ensure_wrapped_if_datetimelike(arr).astype(dtype, copy=copy)
+            if is_ndarray
+            else construct_1d_object_array_from_listlike(arr)
+        )
     elif dtype.kind == "U":
         # TODO: test cases with arr.dtype.kind in "mM"
         if is_ndarray:
@@ -771,8 +756,6 @@ def _try_cast(
     elif dtype.kind in "mM":
         return maybe_cast_to_datetime(arr, dtype)
 
-    # GH#15832: Check if we are requesting a numeric dtype and
-    # that we can convert the data to the requested dtype.
     elif is_integer_dtype(dtype):
         # this will raise if we have e.g. floats
 

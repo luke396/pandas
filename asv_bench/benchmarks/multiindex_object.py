@@ -145,7 +145,7 @@ class Duplicated:
     def setup(self):
         n, k = 200, 5000
         levels = [np.arange(n), tm.makeStringIndex(n).values, 1000 + np.arange(n)]
-        codes = [np.random.choice(n, (k * n)) for lev in levels]
+        codes = [np.random.choice(n, (k * n)) for _ in levels]
         self.mi = MultiIndex(levels=levels, codes=codes)
 
     def time_duplicated(self):
@@ -194,8 +194,7 @@ class Values:
     def setup_cache(self):
         level1 = range(1000)
         level2 = date_range(start="1/1/2012", periods=100)
-        mi = MultiIndex.from_product([level1, level2])
-        return mi
+        return MultiIndex.from_product([level1, level2])
 
     def time_datetime_level_values_copy(self, mi):
         mi.copy().values

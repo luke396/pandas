@@ -321,8 +321,7 @@ class MultiIndexing:
 class IntervalIndexing:
     def setup_cache(self):
         idx = IntervalIndex.from_breaks(np.arange(1000001))
-        monotonic = Series(np.arange(1000000), index=idx)
-        return monotonic
+        return Series(np.arange(1000000), index=idx)
 
     def time_getitem_scalar(self, monotonic):
         monotonic[80000]
@@ -414,8 +413,7 @@ class CategoricalIndexIndexing:
 
 class MethodLookup:
     def setup_cache(self):
-        s = Series()
-        return s
+        return Series()
 
     def time_lookup_iloc(self, s):
         s.iloc
@@ -484,7 +482,7 @@ class InsertColumns:
     def time_insert_middle(self):
         # same as time_insert but inserting to a middle column rather than
         #  front or back (which have fast-paths)
-        for i in range(100):
+        for _ in range(100):
             self.df2.insert(
                 1, "colname", np.random.randn(self.N), allow_duplicates=True
             )

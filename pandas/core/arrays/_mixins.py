@@ -172,9 +172,11 @@ class NDArrayBackedExtensionArray(NDArrayBacked, ExtensionArray):
     def equals(self, other) -> bool:
         if type(self) is not type(other):
             return False
-        if not is_dtype_equal(self.dtype, other.dtype):
-            return False
-        return bool(array_equivalent(self._ndarray, other._ndarray, dtype_equal=True))
+        return (
+            bool(array_equivalent(self._ndarray, other._ndarray, dtype_equal=True))
+            if is_dtype_equal(self.dtype, other.dtype)
+            else False
+        )
 
     @classmethod
     def _from_factorized(cls, values, original):
@@ -285,8 +287,7 @@ class NDArrayBackedExtensionArray(NDArrayBacked, ExtensionArray):
         if lib.is_scalar(result):
             return self._box_func(result)
 
-        result = self._from_backing_data(result)
-        return result
+        return self._from_backing_data(result)
 
     def _fill_mask_inplace(
         self, method: str, limit: int | None, mask: npt.NDArray[np.bool_]
@@ -435,12 +436,7 @@ class NDArrayBackedExtensionArray(NDArrayBacked, ExtensionArray):
             Series,
         )
 
-        if dropna:
-            # error: Unsupported operand type for ~ ("ExtensionArray")
-            values = self[~self.isna()]._ndarray  # type: ignore[operator]
-        else:
-            values = self._ndarray
-
+        values = self[~self.isna()]._ndarray if dropna else self._ndarray
         result = value_counts(values, sort=False, dropna=dropna)
 
         index_arr = self._from_backing_data(np.asarray(result.index._data))

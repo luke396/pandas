@@ -211,9 +211,7 @@ class ArrowStringArray(ObjectStringArrayMixin, ArrowExtensionArray, BaseStringAr
         dtype = pandas_dtype(dtype)
 
         if is_dtype_equal(dtype, self.dtype):
-            if copy:
-                return self.copy()
-            return self
+            return self.copy() if copy else self
         elif isinstance(dtype, NumericDtype):
             data = self._pa_array.cast(pa.from_numpy_dtype(dtype.numpy_dtype))
             return dtype.__from_arrow__(data)
@@ -261,11 +259,7 @@ class ArrowStringArray(ObjectStringArrayMixin, ArrowExtensionArray, BaseStringAr
 
         if is_integer_dtype(dtype) or is_bool_dtype(dtype):
             constructor: type[IntegerArray] | type[BooleanArray]
-            if is_integer_dtype(dtype):
-                constructor = IntegerArray
-            else:
-                constructor = BooleanArray
-
+            constructor = IntegerArray if is_integer_dtype(dtype) else BooleanArray
             na_value_is_na = isna(na_value)
             if na_value_is_na:
                 na_value = 1
@@ -308,16 +302,15 @@ class ArrowStringArray(ObjectStringArrayMixin, ArrowExtensionArray, BaseStringAr
             return super()._str_contains(pat, case, flags, na, regex)
 
         if regex:
-            if case is False:
+            if case:
+                result = pc.match_substring_regex(self._pa_array, pat)
+            else:
                 fallback_performancewarning()
                 return super()._str_contains(pat, case, flags, na, regex)
-            else:
-                result = pc.match_substring_regex(self._pa_array, pat)
+        elif case:
+            result = pc.match_substring(self._pa_array, pat)
         else:
-            if case:
-                result = pc.match_substring(self._pa_array, pat)
-            else:
-                result = pc.match_substring(pc.utf8_upper(self._pa_array), pat.upper())
+            result = pc.match_substring(pc.utf8_upper(self._pa_array), pat.upper())
         result = BooleanDtype().__from_arrow__(result)
         if not isna(na):
             result[isna(result)] = bool(na)

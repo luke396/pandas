@@ -112,7 +112,7 @@ class ParallelGroupbyMethods:
         self.parallel()
 
     def time_loop(self, threads, method):
-        for i in range(threads):
+        for _ in range(threads):
             self.loop()
 
 
@@ -320,7 +320,7 @@ class ParallelFactorize:
         self.parallel()
 
     def time_loop(self, threads):
-        for i in range(threads):
+        for _ in range(threads):
             self.loop()
 
 

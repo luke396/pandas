@@ -129,17 +129,18 @@ class Groups:
 
     def setup_cache(self):
         size = 10**6
-        data = {
+        return {
             "int64_small": Series(np.random.randint(0, 100, size=size)),
             "int64_large": Series(np.random.randint(0, 10000, size=size)),
             "object_small": Series(
                 tm.makeStringIndex(100).take(np.random.randint(0, 100, size=size))
             ),
             "object_large": Series(
-                tm.makeStringIndex(10000).take(np.random.randint(0, 10000, size=size))
+                tm.makeStringIndex(10000).take(
+                    np.random.randint(0, 10000, size=size)
+                )
             ),
         }
-        return data
 
     def setup(self, data, key):
         self.ser = data[key]
@@ -238,7 +239,7 @@ class CountMultiDtype:
         value2[np.random.rand(n) > 0.5] = np.nan
         obj = np.random.choice(list("ab"), size=n).astype(object)
         obj[np.random.randn(n) > 0.5] = np.nan
-        df = DataFrame(
+        return DataFrame(
             {
                 "key1": np.random.randint(0, 500, size=n),
                 "key2": np.random.randint(0, 100, size=n),
@@ -250,7 +251,6 @@ class CountMultiDtype:
                 "offsets": offsets,
             }
         )
-        return df
 
     def time_multi_count(self, df):
         df.groupby(["key1", "key2"]).count()
@@ -259,7 +259,7 @@ class CountMultiDtype:
 class CountMultiInt:
     def setup_cache(self):
         n = 10000
-        df = DataFrame(
+        return DataFrame(
             {
                 "key1": np.random.randint(0, 500, size=n),
                 "key2": np.random.randint(0, 100, size=n),
@@ -267,7 +267,6 @@ class CountMultiInt:
                 "ints2": np.random.randint(0, 1000, size=n),
             }
         )
-        return df
 
     def time_multi_int_count(self, df):
         df.groupby(["key1", "key2"]).count()
@@ -281,7 +280,7 @@ class AggFunctions:
         N = 10**5
         fac1 = np.array(["A", "B", "C"], dtype="O")
         fac2 = np.array(["one", "two"], dtype="O")
-        df = DataFrame(
+        return DataFrame(
             {
                 "key1": fac1.take(np.random.randint(0, 3, size=N)),
                 "key2": fac2.take(np.random.randint(0, 2, size=N)),
@@ -290,7 +289,6 @@ class AggFunctions:
                 "value3": np.random.randn(N),
             }
         )
-        return df
 
     def time_different_str_functions(self, df):
         df.groupby(["key1", "key2"]).agg(
@@ -330,7 +328,7 @@ class MultiColumn:
         key2 = key1.copy()
         np.random.shuffle(key1)
         np.random.shuffle(key2)
-        df = DataFrame(
+        return DataFrame(
             {
                 "key1": key1,
                 "key2": key2,
@@ -338,7 +336,6 @@ class MultiColumn:
                 "data2": np.random.randn(N),
             }
         )
-        return df
 
     def time_lambda_sum(self, df):
         df.groupby(["key1", "key2"]).agg(lambda x: x.values.sum())
@@ -615,12 +612,11 @@ class Cumulative:
             null_vals[::2, :] = np.nan
             null_vals[::3, :] = np.nan
             df = DataFrame(null_vals, columns=list("abcde"), dtype=dtype)
-            df["key"] = keys
-            self.df = df
         else:
             df = DataFrame(vals, columns=list("abcde")).astype(dtype, copy=False)
-            df["key"] = keys
-            self.df = df
+
+        df["key"] = keys
+        self.df = df
 
     def time_frame_transform(self, dtype, method, with_nans):
         self.df.groupby("key").transform(method)
@@ -918,10 +914,7 @@ class AggEngine:
         def function(values, index):
             total = 0
             for i, value in enumerate(values):
-                if i % 2:
-                    total += value + 5
-                else:
-                    total += value * 2
+                total += value + 5 if i % 2 else value * 2
             return total
 
         self.grouper[1].agg(
@@ -932,10 +925,7 @@ class AggEngine:
         def function(values):
             total = 0
             for i, value in enumerate(values):
-                if i % 2:
-                    total += value + 5
-                else:
-                    total += value * 2
+                total += value + 5 if i % 2 else value * 2
             return total
 
         self.grouper[1].agg(function, engine="cython")
@@ -944,10 +934,7 @@ class AggEngine:
         def function(values, index):
             total = 0
             for i, value in enumerate(values):
-                if i % 2:
-                    total += value + 5
-                else:
-                    total += value * 2
+                total += value + 5 if i % 2 else value * 2
             return total
 
         self.grouper.agg(
@@ -958,10 +945,7 @@ class AggEngine:
         def function(values):
             total = 0
             for i, value in enumerate(values):
-                if i % 2:
-                    total += value + 5
-                else:
-                    total += value * 2
+                total += value + 5 if i % 2 else value * 2
             return total
 
         self.grouper.agg(function, engine="cython")

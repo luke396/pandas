@@ -80,7 +80,7 @@ class TimeseriesPlotting:
         self.df = DataFrame(np.random.randn(N, M), index=idx)
 
         idx_irregular = DatetimeIndex(
-            np.concatenate((idx.values[0:10], idx.values[12:]))
+            np.concatenate((idx.values[:10], idx.values[12:]))
         )
         self.df2 = DataFrame(
             np.random.randn(len(idx_irregular), M), index=idx_irregular

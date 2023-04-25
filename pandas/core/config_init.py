@@ -304,10 +304,7 @@ def is_terminal() -> bool:
     except NameError:  # assume standard Python interpreter in a terminal
         return True
     else:
-        if hasattr(ip, "kernel"):  # IPython as a Jupyter kernel
-            return False
-        else:  # IPython in a terminal
-            return True
+        return not hasattr(ip, "kernel")
 
 
 with cf.config_prefix("display"):
@@ -339,10 +336,7 @@ with cf.config_prefix("display"):
         max_colwidth_doc,
         validator=is_nonnegative_int,
     )
-    if is_terminal():
-        max_cols = 0  # automatically determine optimal number of columns
-    else:
-        max_cols = 20  # cannot determine optimal number of columns
+    max_cols = 0 if is_terminal() else 20
     cf.register_option(
         "max_columns", max_cols, pc_max_cols_doc, validator=is_nonnegative_int
     )
